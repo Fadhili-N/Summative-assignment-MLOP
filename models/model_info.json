@@ -1,0 +1,16 @@
+{
+  "best_experiment": "exp4_finetune",
+  "test_metrics": {
+    "accuracy": 0.9581519109820996,
+    "precision": 0.9681840430739109,
+    "recall": 0.9482262703739214,
+    "f1": 0.9581012351658997,
+    "auc": 0.9904044307661193,
+    "loss": 0.13531368970870972
+  },
+  "img_size": 128,
+  "class_names": [
+    "Parasitized",
+    "Uninfected"
+  ]
+}

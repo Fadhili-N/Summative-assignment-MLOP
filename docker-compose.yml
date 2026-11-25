@@ -1,0 +1,30 @@
+# Run N copies of the app behind one load balancer:
+#   docker compose up --build -d --scale app=3
+# Then open http://localhost:8080
+services:
+  app:
+    build: .
+    cpus: "1.0"                 # each container gets 1 CPU core, so adding containers adds capacity
+    environment:
+      DB_PATH: /state/app.db    # shared by all replicas
+      UPLOAD_DIR: /state/uploads
+      RETRAIN_THRESHOLD: "50"
+      # The container is limited to 1 CPU, so tell TensorFlow to use 1 thread, not 8.
+      TF_NUM_INTRAOP_THREADS: "1"
+      TF_NUM_INTEROP_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    volumes:
+      - state:/state            # uploads + database shared between replicas
+      - ./models:/app/models    # the live model file shared between replicas
+    expose:
+      - "8000"
+  lb:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+volumes:
+  state:

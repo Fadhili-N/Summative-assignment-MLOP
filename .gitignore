@@ -1,0 +1,13 @@
+﻿data/train/*
+data/test/*
+data/uploads/
+*.db
+.env
+__pycache__/
+.venv/
+*.ipynb_checkpoints
+!data/train/.gitkeep
+!data/test/.gitkeep
+data/_tfds_cache/
+models/malaria_model_backup_*.h5
+models/*.db

@@ -1,0 +1,13 @@
+.venv
+.git
+__pycache__
+*.pyc
+data/train
+data/test
+data/uploads
+data/_tfds_cache
+models/app.db
+models/malaria_model_backup_*.h5
+results
+notebook
+tests

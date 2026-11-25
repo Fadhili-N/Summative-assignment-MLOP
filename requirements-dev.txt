@@ -1,0 +1,6 @@
+-r requirements.txt
+locust
+tensorflow-datasets
+importlib_resources
+pandas
+matplotlib

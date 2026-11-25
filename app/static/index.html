@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Malaria Cell Classifier</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1c2430; --muted:#5d6b7c; --line:#dde2e8; --accent:#0b6e4f;
+          --bad:#b42318; --good:#0b6e4f; --c1:#c2410c; --c2:#1d4ed8; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12161c; --card:#1a2028; --text:#e6eaf0; --muted:#98a4b3;
+          --line:#2b3440; --accent:#34d399; --bad:#f87171; --good:#34d399; --c1:#fb923c; --c2:#60a5fa; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:20px 16px 0; max-width:960px; margin:auto; }
+  h1 { font-size:1.4rem; margin:0 0 4px; } .sub { color:var(--muted); margin:0 0 14px; }
+  nav { display:flex; gap:6px; flex-wrap:wrap; max-width:960px; margin:auto; padding:0 16px; border-bottom:1px solid var(--line); }
+  nav button { background:none; border:0; border-bottom:3px solid transparent; padding:10px 14px; font:inherit; color:var(--muted); cursor:pointer; }
+  nav button.on { color:var(--text); border-color:var(--accent); font-weight:600; }
+  main { max-width:960px; margin:auto; padding:16px; }
+  section { display:none; } section.on { display:block; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  .grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); }
+  h2 { font-size:1.1rem; margin:0 0 8px; } h3 { font-size:1rem; margin:0 0 6px; }
+  button.act { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:10px 16px; font:inherit; cursor:pointer; }
+  @media (prefers-color-scheme: dark) { button.act { color:#06281c; } }
+  button.act:disabled { opacity:.5; cursor:wait; }
+  input[type=file], select, input[type=text] { font:inherit; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); max-width:100%; }
+  .result { font-size:1.3rem; font-weight:700; } .muted { color:var(--muted); font-size:.9rem; }
+  .bar { height:10px; background:var(--line); border-radius:6px; overflow:hidden; margin:8px 0; }
+  .bar > i { display:block; height:100%; background:var(--accent); }
+  .stat { font-size:1.6rem; font-weight:700; } .stat small { display:block; font-size:.8rem; font-weight:400; color:var(--muted); }
+  img.preview { max-width:180px; max-height:180px; border-radius:8px; border:1px solid var(--line); image-rendering:pixelated; }
+  table { border-collapse:collapse; width:100%; font-size:.9rem; } td,th { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  .story { border-left:3px solid var(--accent); padding-left:12px; margin-top:10px; }
+  .err { color:var(--bad); } .ok { color:var(--good); }
+  canvas { max-height:240px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Malaria Cell Classifier</h1>
+  <p class="sub">Upload a blood-cell image and the model says whether it looks parasitized. A study project, not a medical device.</p>
+</header>
+<nav id="tabs">
+  <button data-t="predict" class="on">Predict</button>
+  <button data-t="data">Upload &amp; Retrain</button>
+  <button data-t="insights">Data insights</button>
+  <button data-t="status">Status</button>
+</nav>
+<main>
+
+<section id="predict" class="on">
+  <div class="card">
+    <h2>Predict one cell image</h2>
+    <div class="row"><input type="file" id="pfile" accept="image/png,image/jpeg"><button class="act" id="pbtn">Predict</button></div>
+    <div id="pout" class="muted">Choose an image (.png or .jpg) and press Predict.</div>
+  </div>
+</section>
+
+<section id="data">
+  <div class="card">
+    <h2>1. Upload new labelled images</h2>
+    <p class="muted">Either a <b>.zip</b> with folders named <code>Parasitized/</code> and <code>Uninfected/</code>, or several images plus a label.</p>
+    <div class="row"><input type="file" id="ufiles" multiple accept=".zip,image/png,image/jpeg">
+      <select id="ulabel"><option value="">label (needed for plain images)</option><option>Parasitized</option><option>Uninfected</option></select>
+      <button class="act" id="ubtn">Upload</button></div>
+    <div id="uout" class="muted"></div>
+  </div>
+  <div class="card">
+    <h2>2. Retrain the model</h2>
+    <p class="muted">Starts from the current saved model and fine-tunes it on the uploaded images (mixed with some original images so it doesn't forget). The new model replaces the old one only if it isn't worse.</p>
+    <div class="row"><span class="stat" id="pending">-<small>images waiting</small></span>
+      <button class="act" id="rbtn">Retrain now</button></div>
+    <div class="row"><label class="muted">Admin token (only if the server needs one) <input type="text" id="token" size="14"></label></div>
+    <div id="rout" class="muted"></div>
+  </div>
+  <div class="card"><h3>Retraining history</h3><div id="rhist" class="muted">No retraining yet.</div></div>
+</section>
+
+<section id="insights">
+  <div id="insights-body"><div class="card muted">Loading insights...</div></div>
+</section>
+
+<section id="status">
+  <div class="grid">
+    <div class="card"><div class="stat" id="s-up">-<small>uptime</small></div></div>
+    <div class="card"><div class="stat" id="s-ver">-<small>model version</small></div></div>
+    <div class="card"><div class="stat" id="s-pred">-<small>predictions served</small></div></div>
+    <div class="card"><div class="stat" id="s-lat">-<small>mean / p95 latency (ms)</small></div></div>
+  </div>
+  <div class="grid">
+    <div class="card"><h3>Model quality (held-out test set)</h3><div id="s-metrics" class="muted"></div></div>
+    <div class="card"><h3>Confidence of live predictions</h3><canvas id="confChart"></canvas>
+      <div id="s-low" class="muted"></div></div>
+  </div>
+</section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const hdr = () => { const t = $('#token').value.trim(); return t ? {'X-Admin-Token': t} : {}; };
+const fmtUp = s => s < 90 ? s + ' s' : s < 5400 ? Math.round(s/60) + ' min' : (s/3600).toFixed(1) + ' h';
+const cssv = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let charts = {}, insightsLoaded = false;
+
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === b.dataset.t));
+  if (b.dataset.t === 'insights' && !insightsLoaded) loadInsights();
+  if (b.dataset.t === 'status') loadStatus();
+  if (b.dataset.t === 'data') loadRetrain();
+});
+
+async function api(url, opts) {
+  const r = await fetch(url, opts); let j = {};
+  try { j = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(j.detail || ('Request failed (' + r.status + ')'));
+  return j;
+}
+
+// ---- predict ----
+$('#pfile').onchange = () => {
+  const f = $('#pfile').files[0]; if (!f) return;
+  $('#pout').innerHTML = '<img class="preview" src="' + URL.createObjectURL(f) + '"> <span class="muted">Ready.</span>';
+};
+$('#pbtn').onclick = async () => {
+  const f = $('#pfile').files[0]; if (!f) { $('#pout').textContent = 'Choose an image first.'; return; }
+  $('#pbtn').disabled = true;
+  try {
+    const fd = new FormData(); fd.append('file', f);
+    const r = await api('/api/predict', {method: 'POST', body: fd});
+    const bad = r.label === 'Parasitized', pct = (r.confidence * 100).toFixed(1);
+    $('#pout').innerHTML = '<img class="preview" src="' + URL.createObjectURL(f) + '">' +
+      '<div class="result ' + (bad ? 'err' : 'ok') + '">' + r.label + '</div>' +
+      '<div>Confidence ' + pct + '%</div><div class="bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="muted">P(parasitized) ' + (r.p_parasitized*100).toFixed(1) + '% &middot; ' + r.latency_ms + ' ms' +
+      (r.confidence < 0.7 ? ' &middot; <b>low confidence, treat with caution</b>' : '') + '</div>';
+  } catch (e) { $('#pout').innerHTML = '<span class="err">' + e.message + '</span>'; }
+  $('#pbtn').disabled = false;
+};
+
+// ---- upload / retrain ----
+$('#ubtn').onclick = async () => {
+  const files = $('#ufiles').files; if (!files.length) { $('#uout').textContent = 'Choose files first.'; return; }
+  $('#ubtn').disabled = true; $('#uout').textContent = 'Uploading...';
+  try {
+    const fd = new FormData(); for (const f of files) fd.append('files', f); fd.append('label', $('#ulabel').value);
+    const r = await api('/api/upload', {method: 'POST', body: fd, headers: hdr()});
+    $('#uout').innerHTML = '<span class="ok">Saved ' + r.saved + ' images</span> (' + r.skipped + ' skipped). ' +
+      r.pending + ' waiting for retraining; auto-retrain starts at ' + r.threshold + '.' +
+      (r.auto_retrain_started ? ' <b>Automatic retraining started.</b>' : '');
+    loadRetrain();
+  } catch (e) { $('#uout').innerHTML = '<span class="err">' + e.message + '</span>'; }
+  $('#ubtn').disabled = false;
+};
+$('#rbtn').onclick = async () => {
+  $('#rbtn').disabled = true;
+  try { await api('/api/retrain', {method: 'POST', headers: hdr()}); $('#rout').textContent = 'Retraining started...'; pollRetrain(); }
+  catch (e) { $('#rout').innerHTML = '<span class="err">' + e.message + '</span>'; $('#rbtn').disabled = false; }
+};
+function showReport(l) {
+  if (!l) return '';
+  if (!l.ok) return '<span class="err">Retraining failed: ' + l.error + '</span>';
+  return '<b class="' + (l.accepted ? 'ok' : 'err') + '">' + (l.accepted ? 'New model accepted and now live.' : 'New model was worse, old model kept.') + '</b>' +
+    '<table><tr><th></th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th></tr>' +
+    ['before','after'].map(k => '<tr><td>' + k + '</td>' + ['accuracy','precision','recall','f1'].map(m => '<td>' + l[k][m] + '</td>').join('') + '</tr>').join('') +
+    '</table>' + (l.reference_before ? '<div class="muted" style="margin-top:8px">Fixed check on 200 original test images (guards against getting worse overall):</div><table><tr><th></th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th></tr>' +
+    ['reference_before','reference_after'].map(k => '<tr><td>' + k.replace('reference_','') + '</td>' + ['accuracy','precision','recall','f1'].map(m => '<td>' + l[k][m] + '</td>').join('') + '</tr>').join('') + '</table>' : '') +
+    '<div class="muted">' + l.new_images + ' new + ' + l.replay_images + ' original images, ' + l.epochs_run + ' epochs, ' + l.seconds + ' s. Measured on a held-out slice of this data.</div>';
+}
+async function loadRetrain() {
+  try {
+    const s = await api('/api/retrain/status');
+    $('#pending').innerHTML = s.pending + '<small>images waiting (auto-retrain at ' + s.threshold + ')</small>';
+    $('#rbtn').disabled = s.running;
+    if (s.running) $('#rout').textContent = 'Retraining in progress...';
+    else if (s.last) $('#rout').innerHTML = showReport(s.last);
+    $('#rhist').innerHTML = s.history.length ? '<table><tr><th>When</th><th>New images</th><th>Result</th></tr>' +
+      s.history.map(h => '<tr><td>' + h.ts + '</td><td>' + h.n_images + '</td><td>' + (h.accepted ? 'accepted (F1 ' + h.report.before.f1 + ' → ' + h.report.after.f1 + ')' : 'rejected') + '</td></tr>').join('') + '</table>' : 'No retraining yet.';
+    return s;
+  } catch (e) {}
+}
+function pollRetrain() { const t = setInterval(async () => { const s = await loadRetrain(); if (s && !s.running) clearInterval(t); }, 2500); }
+
+// ---- insights ----
+async function loadInsights() {
+  const d = await api('/api/insights'); const body = $('#insights-body');
+  if (!d.features.length) { body.innerHTML = '<div class="card muted">No insights file yet. Run <code>python -m src.insights</code>.</div>'; return; }
+  insightsLoaded = true;
+  body.innerHTML = '<div class="card muted">Based on ' + Object.values(d.n_per_class).join(' + ') + ' randomly sampled training images (Parasitized + Uninfected). Each chart shows how common each value is within its class.</div>' +
+    d.features.map(f => '<div class="card"><h2>' + f.title + '</h2><div class="muted">' + f.description +
+      ' &middot; class means: ' + Object.entries(f.classes).map(([c, v]) => c + ' ' + v.mean).join(' vs ') +
+      ' &middot; effect size d = ' + f.effect_size + '</div><canvas id="c-' + f.key + '"></canvas>' +
+      (f.story ? '<div class="story">' + f.story + '</div>' : '') + '</div>').join('');
+  d.features.forEach(f => {
+    const labels = f.edges.slice(0, -1).map((e, i) => ((e + f.edges[i+1]) / 2).toFixed(2));
+    new Chart($('#c-' + f.key), { type: 'bar',
+      data: { labels, datasets: Object.entries(f.classes).map(([c, v], i) => ({ label: c, data: v.hist.map(x => x * 100),
+        backgroundColor: (i ? cssv('--c2') : cssv('--c1')) + 'b0' })) },
+      options: { responsive: true, scales: { y: { title: { display: true, text: '% of images' } } }, plugins: { legend: { position: 'bottom' } } } });
+  });
+}
+
+// ---- status ----
+async function loadStatus() {
+  try {
+    const [h, m] = await Promise.all([api('/api/health'), api('/api/monitor')]);
+    $('#s-up').innerHTML = fmtUp(h.uptime_seconds) + '<small>uptime (since ' + h.started_at + ')</small>';
+    $('#s-ver').innerHTML = 'v' + h.model_version + '<small>base: ' + h.base_model + '</small>';
+    $('#s-pred').innerHTML = m.total_predictions + '<small>predictions served</small>';
+    $('#s-lat').innerHTML = (m.latency_ms.mean ?? '-') + ' / ' + (m.latency_ms.p95 ?? '-') + '<small>mean / p95 latency (ms)</small>';
+    const t = h.test_metrics || {};
+    $('#s-metrics').innerHTML = '<table>' + Object.entries(t).map(([k, v]) => '<tr><td>' + k + '</td><td>' + (+v).toFixed(4) + '</td></tr>').join('') + '</table>';
+    $('#s-low').textContent = m.low_confidence_share == null ? 'No predictions yet.' : Math.round(m.low_confidence_share * 100) + '% of live predictions had confidence below 70%. A rising share can signal that incoming images differ from the training data.';
+    charts.conf && charts.conf.destroy();
+    charts.conf = new Chart($('#confChart'), { type: 'bar',
+      data: { labels: m.confidence_hist.map((_, i) => (50 + i * 5) + '-' + (55 + i * 5) + '%'), datasets: [{ label: 'predictions', data: m.confidence_hist, backgroundColor: cssv('--accent') }] },
+      options: { plugins: { legend: { display: false } } } });
+  } catch (e) { $('#s-up').textContent = 'Server unreachable'; }
+}
+loadStatus(); setInterval(() => { if ($('#status').classList.contains('on')) loadStatus(); }, 5000);
+</script>
+</body>
+</html>
