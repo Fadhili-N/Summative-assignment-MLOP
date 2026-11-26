@@ -6,7 +6,7 @@ This is a school project, not a medical tool. Please don't use it to diagnose an
 
 | | |
 |---|---|
-| **Video demo (YouTube)** | `TODO: paste link` |
+| **Video demo (YouTube)** | https://youtu.be/r48iowd3-oo |
 | **Live app** | http://172.189.158.124:8000 (Azure, France Central, plain `http`, API docs at `/docs`) |
 | **GitHub repo** | https://github.com/Fadhili-N/Summative-assignment-MLOP |
 
