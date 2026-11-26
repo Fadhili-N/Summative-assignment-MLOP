@@ -175,14 +175,21 @@ async function loadRetrain() {
     const s = await api('/api/retrain/status');
     $('#pending').innerHTML = s.pending + '<small>images waiting (auto-retrain at ' + s.threshold + ')</small>';
     $('#rbtn').disabled = s.running;
-    if (s.running) $('#rout').textContent = 'Retraining in progress...';
+    if (s.running) { $('#rout').textContent = 'Retraining in progress...'; pollRetrain(); }   // keep checking until it finishes
     else if (s.last) $('#rout').innerHTML = showReport(s.last);
     $('#rhist').innerHTML = s.history.length ? '<table><tr><th>When</th><th>New images</th><th>Result</th></tr>' +
       s.history.map(h => '<tr><td>' + h.ts + '</td><td>' + h.n_images + '</td><td>' + (h.accepted ? 'accepted (F1 ' + h.report.before.f1 + ' → ' + h.report.after.f1 + ')' : 'rejected') + '</td></tr>').join('') + '</table>' : 'No retraining yet.';
     return s;
   } catch (e) {}
 }
-function pollRetrain() { const t = setInterval(async () => { const s = await loadRetrain(); if (s && !s.running) clearInterval(t); }, 2500); }
+let retrainTimer = null;
+function pollRetrain() {
+  if (retrainTimer) return;   // already checking
+  retrainTimer = setInterval(async () => {
+    const s = await loadRetrain();
+    if (s && !s.running) { clearInterval(retrainTimer); retrainTimer = null; }
+  }, 2500);
+}
 
 // ---- insights ----
 async function loadInsights() {
